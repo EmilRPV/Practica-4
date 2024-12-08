@@ -1,0 +1,111 @@
+SECTION .data
+LF db 0xA                  ; Carácter de salto de línea
+numBuffer times 12 db 0    ; Buffer para números (12 bytes)
+
+SECTION .text
+global _start
+
+_start:
+    pop ecx                ; Número de argumentos (incluye el nombre del programa)
+    dec ecx                ; Reduce el conteo de argumentos (excluye el nombre del programa)
+    cmp ecx, 0             ; Si no hay argumentos, salimos
+    jz noMoreArgs
+    mov ebx, esp           ; Apunta a los argumentos en la pila
+    xor edx, edx           ; Inicializa el acumulador de la suma
+
+nextArg:
+    cmp ecx, 0             ; Verifica si hay más argumentos
+    jz noMoreArgs          ; Si no hay más, salta al final
+    mov eax, [ebx]         ; Obtiene la dirección del argumento actual
+    call atoi              ; Convierte el argumento de ASCII a entero
+    add edx, eax           ; Suma el número convertido al acumulador
+    add ebx, 4             ; Avanza al siguiente argumento en la pila
+    dec ecx                ; Decrementa el contador de argumentos restantes
+    jmp nextArg            ; Repite para el siguiente argumento
+
+noMoreArgs:
+    mov eax, edx           ; Mueve el resultado acumulado a eax para impresión
+    call iprintLF          ; Imprime el resultado seguido de un salto de línea
+    call quit              ; Termina el programa
+
+;------------------------------------------
+; Función: atoi
+; Convierte una cadena ASCII en un entero
+atoi:
+    pusha
+    mov esi, eax           ; Apunta a la cadena en esi
+    xor eax, eax           ; Inicializa eax a 0
+    xor ecx, ecx           ; Inicializa el contador a 0
+
+atoiLoop:
+    xor ebx, ebx
+    mov bl, [esi + ecx]    ; Carga un carácter de la cadena
+    cmp bl, 48             ; Compara con '0'
+    jl atoiEnd             ; Si es menor, termina
+    cmp bl, 57             ; Compara con '9'
+    jg atoiEnd             ; Si es mayor, termina
+
+    sub bl, 48             ; Convierte de ASCII a valor numérico
+    add eax, ebx           ; Agrega el dígito al acumulador
+    mov ebx, 10            ; Multiplica por 10
+    mul ebx
+    inc ecx                ; Avanza al siguiente carácter
+    jmp atoiLoop           ; Repite
+
+atoiEnd:
+    popa
+    ret
+
+;------------------------------------------
+; Función: iprintLF
+; Imprime un número seguido de un salto de línea
+iprintLF:
+    pusha
+    mov ecx, eax           ; Copia el número a convertir
+    call itoa              ; Convierte el número en string
+    mov eax, 4             ; syscall: sys_write
+    mov ebx, 1             ; file descriptor: stdout
+    lea ecx, [numBuffer]   ; Dirección del buffer
+    mov edx, 12            ; Longitud máxima del buffer
+    int 0x80
+    ; Imprime un salto de línea
+    mov eax, 4
+    mov ebx, 1
+    lea ecx, [LF]
+    mov edx, 1
+    int 0x80
+    popa
+    ret
+
+;------------------------------------------
+; Función: itoa
+; Convierte un número en string
+itoa:
+    pusha
+    mov ebx, 10            ; Base decimal
+    xor ecx, ecx
+    mov edi, numBuffer + 11
+    mov byte [edi], 0
+    dec edi
+
+itoaLoop:
+    xor edx, edx
+    div ebx
+    add dl, '0'
+    mov [edi], dl
+    dec edi
+    inc ecx
+    test eax, eax
+    jnz itoaLoop
+
+    lea eax, [edi + 1]
+    popa
+    ret
+
+;------------------------------------------
+; Función: quit
+; Termina el programa
+quit:
+    mov eax, 1             ; syscall: sys_exit
+    xor ebx, ebx           ; Código de salida 0
+    int 0x80
