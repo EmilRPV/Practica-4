@@ -1,0 +1,96 @@
+SECTION .data
+msg1 db ' remainder ', 0xA, 0 ; Mensaje para mostrar el resto
+LF db 0xA                     ; Carácter de salto de línea
+numBuffer times 12 db 0       ; Buffer para números (12 bytes)
+
+SECTION .text
+global _start
+
+_start:
+    ; División de dos números
+    mov eax, 90              ; Primer número (dividendo)
+    xor edx, edx             ; Limpia el registro EDX para evitar problemas
+    mov ebx, 9               ; Segundo número (divisor)
+    div ebx                  ; Divide eax entre ebx (cociente en eax, resto en edx)
+    call iprint              ; Imprime el cociente
+    lea eax, [msg1]          ; Carga la dirección del mensaje
+    call sprint              ; Imprime el mensaje "remainder"
+    mov eax, edx             ; Carga el resto en eax
+    call iprintLF            ; Imprime el resto seguido de un salto de línea
+
+    ; Salir del programa
+    call quit
+
+; Función: iprint
+; Imprime un número sin salto de línea
+iprint:
+    pusha
+    mov ecx, eax             ; Copia el número a convertir
+    call itoa                ; Convierte el número en un string
+    mov eax, 4               ; syscall: sys_write
+    mov ebx, 1               ; file descriptor: stdout
+    lea ecx, [numBuffer]     ; Dirección del buffer
+    mov edx, 12              ; Longitud máxima del buffer
+    int 0x80                 ; Llamada al sistema
+    popa
+    ret
+
+; Función: sprint
+; Imprime una cadena de texto
+sprint:
+    pusha
+    mov eax, 4               ; syscall: sys_write
+    mov ebx, 1               ; file descriptor: stdout
+    mov edx, 12              ; Máxima longitud a imprimir
+    int 0x80                 ; Llamada al sistema
+    popa
+    ret
+
+; Función: iprintLF
+; Imprime un número seguido de un salto de línea
+iprintLF:
+    pusha
+    mov ecx, eax             ; Copia el número a convertir
+    call itoa                ; Convierte el número en un string
+    mov eax, 4               ; syscall: sys_write
+    mov ebx, 1               ; file descriptor: stdout
+    lea ecx, [numBuffer]     ; Dirección del buffer
+    mov edx, 12              ; Longitud máxima del buffer
+    int 0x80                 ; Llamada al sistema
+    ; Imprime un salto de línea
+    mov eax, 4
+    mov ebx, 1
+    lea ecx, [LF]
+    mov edx, 1
+    int 0x80                 ; Llamada al sistema
+    popa
+    ret
+
+; Función: itoa
+; Convierte un número en string (en base 10)
+itoa:
+    pusha
+    mov ebx, 10              ; Base decimal
+    xor ecx, ecx             ; Contador de longitud
+    mov edi, numBuffer + 11  ; Apunta al final del buffer
+    mov byte [edi], 0        ; Asegura terminación nula
+    dec edi
+itoa_loop:
+    xor edx, edx
+    div ebx                  ; Divide eax entre 10
+    add dl, '0'              ; Convierte el resto a carácter ASCII
+    mov [edi], dl            ; Almacena el carácter en el buffer
+    dec edi
+    inc ecx
+    test eax, eax
+    jnz itoa_loop            ; Repite mientras eax != 0
+    lea eax, [edi + 1]       ; Ajusta puntero al inicio del string
+    popa
+    ret
+
+; Función: quit
+; Termina el programa
+quit:
+    mov eax, 1               ; syscall: sys_exit
+    xor ebx, ebx             ; Código de salida 0
+    int 0x80                 ; Llamada al sistema
