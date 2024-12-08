@@ -1,0 +1,116 @@
+; Namespace
+; Compile with: nasm -f elf namespace.asm
+; Link with (64 bit systems require elf_i386 option): ld -m elf_i386 namespace.o -o namespace
+; Run with: ./namespace
+
+SECTION .data
+msg1        db      'Jumping to finished label.', 0h        ; A message string
+msg2        db      'Inside subroutine number: ', 0h        ; A message string
+msg3        db      'Inside subroutine "finished".', 0h     ; A message string
+
+SECTION .text
+global  _start
+
+_start:
+
+subroutineOne:
+    mov     eax, msg1       ; Move the address of msg1 into eax
+    call    sprintLF        ; Call our string printing with linefeed function
+    jmp     finishedOne    ; Jump to the finished label for subroutineOne
+
+finishedOne:
+    mov     eax, msg2       ; Move the address of msg2 into eax
+    call    sprint          ; Call our string printing function
+    mov     eax, 1          ; Move the value one into eax (for subroutine number one)
+    call    iprintLF        ; Call our integer printing function with linefeed function
+    jmp subroutineTwo      ; Jump to the next subroutine
+
+subroutineTwo:
+    mov     eax, msg1       ; Move the address of msg1 into eax
+    call    sprintLF        ; Call our string printing with linefeed function
+    jmp     finishedTwo    ; Jump to the finished label for subroutineTwo
+
+finishedTwo:
+    mov     eax, msg2       ; Move the address of msg2 into eax
+    call    sprint          ; Call our string printing function
+    mov     eax, 2          ; Move the value two into eax (for subroutine number two)
+    call    iprintLF        ; Call our integer printing function with linefeed function
+
+    mov     eax, msg1       ; Move the address of msg1 into eax
+    call    sprintLF        ; Call our string printing with linefeed function
+    jmp finishedGlobal     ; Jump to the global finished label
+
+finishedGlobal:
+    mov     eax, msg3       ; Move the address of msg3 into eax
+    call    sprintLF        ; Call our string printing with linefeed function
+    call    quit            ; Call our quit function
+
+
+; Function Definitions
+
+; Print integer with linefeed
+iprintLF:
+    push    ebx
+    push    edx
+    mov     ebx, 10         ; Decimal base
+    mov     edx, 0          ; Clear the edx register
+    div     ebx             ; Divide eax by 10, result in eax, remainder in edx
+    add     dl, '0'         ; Convert remainder to ASCII
+    mov     [esp-1], dl     ; Store ASCII character
+    mov     eax, 4          ; sys_write syscall
+    mov     ebx, 1          ; File descriptor (stdout)
+    sub     esp, 1          ; Allocate space for one byte
+    mov     dl, [esp-1]     ; Load the character to print
+    int     0x80            ; Call kernel
+    add     esp, 1          ; Clean up the stack
+    pop     edx
+    pop     ebx
+    ret
+
+; Print integer
+iprint:
+    push    ebx
+    push    edx
+    mov     ebx, 10         ; Decimal base
+    mov     edx, 0          ; Clear the edx register
+    div     ebx             ; Divide eax by 10, result in eax, remainder in edx
+    add     dl, '0'         ; Convert remainder to ASCII
+    mov     [esp-1], dl     ; Store ASCII character
+    mov     eax, 4          ; sys_write syscall
+    mov     ebx, 1          ; File descriptor (stdout)
+    sub     esp, 1          ; Allocate space for one byte
+    mov     dl, [esp-1]     ; Load the character to print
+    int     0x80            ; Call kernel
+    add     esp, 1          ; Clean up the stack
+    pop     edx
+    pop     ebx
+    ret
+
+; Print string
+sprint:
+    push    ebx
+    mov     ebx, [esp+4]    ; Get the address of the string from the stack
+    mov     eax, 4          ; sys_write syscall
+    mov     edx, [ebx]      ; Load the address of the string
+    mov     ecx, [ebx+4]    ; Get the length of the string (adjust for the pointer)
+    int     0x80            ; Call kernel
+    pop     ebx
+    ret
+
+; Print string with linefeed
+sprintLF:
+    push    eax             ; Save the string address
+    call    sprint          ; Print the string
+    mov     al, 10          ; Newline character
+    mov     eax, 4          ; sys_write syscall
+    mov     ebx, 1          ; File descriptor (stdout)
+    int     0x80            ; Call kernel
+    pop     eax             ; Restore the string address
+    ret
+
+; Quit program
+quit:
+    mov     eax, 1          ; sys_exit syscall
+    xor     ebx, ebx        ; Exit status 0
+    int     0x80            ; Call kernel
+    ret
